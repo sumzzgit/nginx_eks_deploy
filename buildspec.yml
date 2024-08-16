@@ -2,11 +2,10 @@
 version: 0.2
 env:
   variables:
-    ECR_URI:
-    ACC_NO:
-    ASSUME_ROLE_ARN:
-    CLUSTER_NAME:
-    REGION:
+    ECR_URI: "public.ecr.aws/b6i5c2k1/nginx"
+    ASSUME_ROLE_ARN: "arn:aws:iam::654654515013:role/eks-access-for-codebuild"
+    CLUSTER_NAME: "ipv6-cluster"
+    REGION: "ap-south-1"
 
 
 
@@ -22,7 +21,7 @@ phases:
     commands:
     - aws sts get-caller-identity
     - echo "------ logging into the python ecr repo ------"
-    - aws ecr get-login-password --region ${REGION} |sudo docker login --username AWS --password-stdin ${ACC_NO}.dkr.ecr.${REGION}.amazonaws.com
+    - aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws/b6i5c2k1
     - echo "------ building the docker images ------"
     - sudo docker build -t nginx .
     - sudo docker tag nginx ${ECR_URI}:${CODEBUILD_BUILD_NUMBER}
