@@ -13,7 +13,7 @@ phases:
   install:
     commands:
     - sudo yum install docker -y
-    - sudo systemctl start docker
+    - sudo service docker start
     - sudo yum install gettext -y
     - curl -O https://s3.us-west-2.amazonaws.com/amazon-eks/1.23.15/2023-01-11/bin/linux/amd64/kubectl
     - chmod +x kubectl
