@@ -4,6 +4,8 @@ metadata:
   name: nginx-deployment
   labels:
     app: nginx
+  annotations:
+    deployment.kubernetes.io/revision: "${CODEBUILD_BUILD_NUMBER}"
 spec:
   replicas: 3
   selector:
@@ -16,6 +18,6 @@ spec:
     spec:
       containers:
       - name: nginx
-        image: <your-docker-registry>/nginx:latest
+        image: ${ECR_URI}:${CODEBUILD_BUILD_NUMBER}
         ports:
         - containerPort: 80

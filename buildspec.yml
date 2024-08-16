@@ -1,0 +1,58 @@
+
+version: 0.2
+env:
+  variables:
+    ECR_URI:
+    ACC_NO:
+    ASSUME_ROLE_ARN:
+    CLUSTER_NAME:
+    REGION:
+
+
+
+phases:
+  install:
+    commands:
+    - sudo yum install docker -y
+    - sudo yum install gettext -y
+    - curl -O https://s3.us-west-2.amazonaws.com/amazon-eks/1.23.15/2023-01-11/bin/linux/amd64/kubectl
+    - chmod +x kubectl
+    - sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+  pre_build:
+    commands:
+    - aws sts get-caller-identity
+    - echo "------ logging into the python ecr repo ------"
+    - aws ecr get-login-password --region ${REGION} |sudo docker login --username AWS --password-stdin ${ACC_NO}.dkr.ecr.${REGION}.amazonaws.com
+    - echo "------ building the docker images ------"
+    - sudo docker build -t nginx .
+    - sudo docker tag nginx ${ECR_URI}:${CODEBUILD_BUILD_NUMBER}
+    - sudo docker tag nginx ${ECR_URI}:latest
+
+
+    - echo "------ pushing docker images ------"
+    - sudo docker push ${ECR_URI}:${CODEBUILD_BUILD_NUMBER}
+    - sudo docker push ${ECR_URI}:latest
+
+  build:
+    commands:
+
+    - echo "------ getting the temporary creds ------"
+    - CREDS=$(aws sts assume-role --role-arn ${ASSUME_ROLE_ARN} --role-session-name codebuild --duration-seconds 900)
+    - export AWS_ACCESS_KEY_ID="$(echo ${CREDS} | jq -r '.Credentials.AccessKeyId')"
+    - export AWS_SECRET_ACCESS_KEY="$(echo ${CREDS} | jq -r '.Credentials.SecretAccessKey')"
+    - export AWS_SESSION_TOKEN="$(echo ${CREDS} | jq -r '.Credentials.SessionToken')"
+    - export AWS_EXPIRATION=$(echo ${CREDS} | jq -r '.Credentials.Expiration')
+
+    - echo "------ logging into eks ------"
+    - aws eks update-kubeconfig --name ${CLUSTER_NAME} --region ${REGION}
+    - echo "------ changing the image in deployment file ------"
+    - envsubst < nginx-deployment.yml > nginx.yml
+
+
+  post_build:
+    commands:
+    - echo "------ applying the manifest files ------"
+    - kubectl apply -f nginx.yml
+    - kubectl apply -f nginx-service.yml
+    - timeout 60s kubectl rollout status deploy/nginx-deployment
+    - if [ $? -ne 0 ]; then echo "Deployment failed or timed out! Initiating rollback."; kubectl rollout undo deployment/nginx-deployment; else echo "Deployment succeeded!"; fi
